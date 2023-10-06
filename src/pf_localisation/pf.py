@@ -16,30 +16,38 @@ class PFLocaliser(PFLocaliserBase):
         super(PFLocaliser, self).__init__()
         
         # ----- Set motion model parameters
+        self.ODOM_ROTATION_NOISE = None
+        self.ODOM_TRANSLATION_NOISE = None
+        self.ODOM_DRIFT_NOISE = None
+        self.particlecloud = None
+        self.currentPose = None
  
         # ----- Sensor model parameters
         self.NUMBER_PREDICTED_READINGS = 20     # Number of readings to predict
         
        
     def initialise_particle_cloud(self, initialpose):
-        """
-        Set particle cloud to initialpose plus noise
-
-        Called whenever an initialpose message is received (to change the
-        starting location of the robot), or a new occupancy_map is received.
-        self.particlecloud can be initialised here. Initial pose of the robot
-        is also set here.
-        
-        :Args:
-            | initialpose: the initial pose estimate
-        :Return:
-            | (geometry_msgs.msg.PoseArray) poses of the particles
-        """
         pass
 
  
     
     def update_particle_cloud(self, scan):
+        new_scan = sensor_msgs.msg.LaserScan
+        particleNo = 1
+
+        """Step 1 of particle filter algorithm"""
+        new_cloud = []
+
+        """Step 2"""
+        for i in range(0,particleNo):
+            """Step 3"""
+            """Step 4"""
+            weight = self.sensor_model.get_weight(self,scan,self.particlecloud[i])
+            """Step 5"""
+            new_cloud.append(weight)
+            print(new_cloud)
+        self.particleCloud = new_cloud
+
         """
         This should use the supplied laser scan to update the current
         particle cloud. i.e. self.particlecloud should be updated.
