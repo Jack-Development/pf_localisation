@@ -22,6 +22,9 @@ class PFLocaliser(PFLocaliserBase):
 
         # ----- Sensor model parameters
         self.NUMBER_PREDICTED_READINGS = 20 # Number of readings to predict
+
+        # ----- Particle cloud configuration
+        self.NUMBER_OF_PARTICLES = 200
         
        
     def initialise_particle_cloud(self, initialpose):
@@ -38,7 +41,9 @@ class PFLocaliser(PFLocaliserBase):
         :Return:
             | (geometry_msgs.msg.PoseArray) poses of the particles
         """
-        pass
+        pose_array = PoseArray()
+        for _ in range(self.NUMBER_OF_PARTICLES):
+            pose_array.poses.append(initialpose)
 
  
     
@@ -70,3 +75,12 @@ class PFLocaliser(PFLocaliserBase):
             | (geometry_msgs.msg.Pose) robot's estimated pose.
          """
         pass
+
+
+# for debugging
+def main():
+    localiser = PFLocaliser()
+    localiser.initialise_particle_cloud(Pose())
+
+if __name__ == "__main__":
+    main()
