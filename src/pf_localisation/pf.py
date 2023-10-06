@@ -17,9 +17,9 @@ class PFLocaliser(PFLocaliserBase):
         super(PFLocaliser, self).__init__()
         
         # ----- Set motion model parameters (alpha values)
-        self.ODOM_ROTATION_NOISE = None # Odometry model rotation noise
-        self.ODOM_TRANSLATION_NOISE = None # Odometry model x axis (forward) noise
-        self.ODOM_DRIFT_NOISE = None # Odometry model y axis (side-to-side) noise
+        self.ODOM_ROTATION_NOISE = 3 # Odometry model rotation noise
+        self.ODOM_TRANSLATION_NOISE = 2 # Odometry model x axis (forward) noise
+        self.ODOM_DRIFT_NOISE = 7 # Odometry model y axis (side-to-side) noise
 
         # ----- Sensor model parameters
         self.NUMBER_PREDICTED_READINGS = 20 # Number of readings to predict
@@ -46,17 +46,16 @@ class PFLocaliser(PFLocaliserBase):
         for _ in range(self.NUMBER_OF_PARTICLES):
             pose_to_append = Pose()
 
-            noise = sample_normal_distribution(0.3) # 0.3 is the variance
+            noise = sample_normal_distribution(0.3)*self.ODOM_TRANSLATION_NOISE # 0.3 is the variance
             pose_to_append.position.x = initialpose.pose.pose.position.x + noise # need to multiply by parameter
 
-            noise = sample_normal_distribution(0.3) # 0.3 is the variance
+            noise = sample_normal_distribution(0.3)*self.ODOM_DRIFT_NOISE # 0.3 is the variance
             pose_to_append.position.y = initialpose.pose.pose.position.y +  noise # need to multiply by parameter
 
-            noise = sample_normal_distribution(0.3) # 0.3 is the variance
+            noise = sample_normal_distribution(0.3)*self.ODOM_TRANSLATION_NOISE # 0.3 is the variance
             pose_to_append.orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise) # need to multiply by parameter
             
             pose_array.poses.append(pose_to_append)
-        print(pose_array)
         return pose_array
 
  
