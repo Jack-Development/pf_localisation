@@ -15,10 +15,13 @@ class PFLocaliser(PFLocaliserBase):
         # ----- Call the superclass constructor
         super(PFLocaliser, self).__init__()
         
-        # ----- Set motion model parameters
- 
+        # ----- Set motion model parameters (alpha values)
+        self.ODOM_ROTATION_NOISE = None # Odometry model rotation noise
+        self.ODOM_TRANSLATION_NOISE = None # Odometry model x axis (forward) noise
+        self.ODOM_DRIFT_NOISE = None # Odometry model y axis (side-to-side) noise
+
         # ----- Sensor model parameters
-        self.NUMBER_PREDICTED_READINGS = 20     # Number of readings to predict
+        self.NUMBER_PREDICTED_READINGS = 20 # Number of readings to predict
         
        
     def initialise_particle_cloud(self, initialpose):
