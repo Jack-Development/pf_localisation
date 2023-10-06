@@ -1,0 +1,30 @@
+# Python files
+*.pyc
+*.pyo
+*.egg
+*.egg-info
+dist/
+build/
+*.egg-info/
+*.egg
+*.log
+*.pot
+*.pyc
+__pycache__/
+
+# Virtual environment
+venv/
+*.venv
+venv.bak/
+ENV/
+
+# PyCharm
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# OS-specific
+.DS_Store
+Thumbs.db
