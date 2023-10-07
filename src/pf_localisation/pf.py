@@ -1,4 +1,4 @@
-from geometry_msgs.msg import Pose, PoseArray, Quaternion
+from geometry_msgs.msg import Pose, PoseArray, Quaternion, Point
 from . pf_base import PFLocaliserBase
 import math
 import rospy
@@ -8,6 +8,24 @@ from . util import rotateQuaternion, getHeading
 from random import random
 
 from time import time
+
+
+# ----- Utility, returns new pose with given attributes
+def new_pose(x, y, angle):
+	
+	pose = Pose()
+	
+	point = Point()
+	point.x = x
+	point.y = y
+	pose.position = point
+	
+	quaternion = Quaternion()
+	quaternion.w = 1.0
+	quaternion = rotateQuaternion(quaternion, angle)
+	pose.orientation = quaternion
+	
+	return pose
 
 
 class PFLocaliser(PFLocaliserBase):
@@ -103,7 +121,30 @@ class PFLocaliser(PFLocaliserBase):
         :Return:
             | (geometry_msgs.msg.Pose) robot's estimated pose.
          """
-        pass
+        
+        # ----- Basic implementation, returns mean pose of all particles
+        
+        particles = len(self.particlecloud.poses)
+        
+        x_sum = 0
+        y_sum = 0
+        sin_angle_sum = 0
+        cos_angle_sum = 0
+        
+        for i in range(0, particles):
+            
+            x_sum += self.particlecloud.poses[i].position.x
+            y_sum += self.particlecloud.poses[i].position.y
+            
+            angle = getHeading(self.particlecloud.poses[i].orientation)
+            sin_angle_sum += math.sin(angle)
+            cos_angle_sum += math.cos(angle)
+        
+        x_mean = x_sum / particles
+        y_mean = y_sum / particles
+        angle_mean = math.atan2(sin_angle_sum, cos_angle_sum)
+        
+        return new_pose(x_mean, y_mean, angle_mean)
 
 # sampling
 def sample_normal_distribution(variance):
