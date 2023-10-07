@@ -2,6 +2,7 @@ from geometry_msgs.msg import Pose, PoseArray, Quaternion
 from . pf_base import PFLocaliserBase
 import math
 import rospy
+import numpy as np
 
 from . util import rotateQuaternion, getHeading
 from random import random
@@ -15,19 +16,47 @@ class PFLocaliser(PFLocaliserBase):
         # ----- Call the superclass constructor
         super(PFLocaliser, self).__init__()
         
-        # ----- Set motion model parameters
-        self.ODOM_ROTATION_NOISE = None
-        self.ODOM_TRANSLATION_NOISE = None
-        self.ODOM_DRIFT_NOISE = None
-        self.particlecloud = None
-        self.currentPose = None
- 
+        # ----- Set motion model parameters (alpha values)
+        self.ODOM_ROTATION_NOISE = 3 # Odometry model rotation noise
+        self.ODOM_TRANSLATION_NOISE = 2 # Odometry model x axis (forward) noise
+        self.ODOM_DRIFT_NOISE = 7 # Odometry model y axis (side-to-side) noise
+
         # ----- Sensor model parameters
-        self.NUMBER_PREDICTED_READINGS = 20     # Number of readings to predict
+        self.NUMBER_PREDICTED_READINGS = 20 # Number of readings to predict
+
+        # ----- Particle cloud configuration
+        self.NUMBER_OF_PARTICLES = 200
         
        
     def initialise_particle_cloud(self, initialpose):
-        pass
+        """
+        Set particle cloud to initialpose plus noise
+
+        Called whenever an initialpose message is received (to change the
+        starting location of the robot), or a new occupancy_map is received.
+        self.particlecloud can be initialised here. Initial pose of the robot
+        is also set here.
+        
+        :Args:
+            | initialpose: the initial pose estimate
+        :Return:
+            | (geometry_msgs.msg.PoseArray) poses of the particles
+        """
+        pose_array = PoseArray()
+        for _ in range(self.NUMBER_OF_PARTICLES):
+            pose_to_append = Pose()
+
+            noise = sample_normal_distribution(0.3)*self.ODOM_TRANSLATION_NOISE # 0.3 is the variance
+            pose_to_append.position.x = initialpose.pose.pose.position.x + noise # need to multiply by parameter
+
+            noise = sample_normal_distribution(0.3)*self.ODOM_DRIFT_NOISE # 0.3 is the variance
+            pose_to_append.position.y = initialpose.pose.pose.position.y +  noise # need to multiply by parameter
+
+            noise = sample_normal_distribution(0.3)*self.ODOM_TRANSLATION_NOISE # 0.3 is the variance
+            pose_to_append.orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise) # need to multiply by parameter
+            
+            pose_array.poses.append(pose_to_append)
+        return pose_array
 
  
     
@@ -75,3 +104,17 @@ class PFLocaliser(PFLocaliserBase):
             | (geometry_msgs.msg.Pose) robot's estimated pose.
          """
         pass
+
+# sampling
+def sample_normal_distribution(variance):
+    s = np.random.normal(0, math.sqrt(variance))
+    return s
+
+
+# for debugging
+def main():
+    localiser = PFLocaliser()
+    localiser.initialise_particle_cloud(Pose())
+
+if __name__ == "__main__":
+    main()
