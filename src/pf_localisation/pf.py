@@ -61,6 +61,22 @@ class PFLocaliser(PFLocaliserBase):
  
     
     def update_particle_cloud(self, scan):
+        new_scan = sensor_msgs.msg.LaserScan
+        particleNo = 1
+
+        """Step 1 of particle filter algorithm"""
+        new_cloud = []
+
+        """Step 2"""
+        for i in range(0,particleNo):
+            """Step 3"""
+            """Step 4"""
+            weight = self.sensor_model.get_weight(self,scan,self.particlecloud[i])
+            """Step 5"""
+            new_cloud.append(weight)
+            print(new_cloud)
+        self.particleCloud = new_cloud
+
         """
         This should use the supplied laser scan to update the current
         particle cloud. i.e. self.particlecloud should be updated.
