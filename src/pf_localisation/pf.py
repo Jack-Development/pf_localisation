@@ -82,9 +82,9 @@ class PFLocaliser(PFLocaliserBase):
         super(PFLocaliser, self).__init__()
 
         # ----- Set motion model parameters (alpha values)
-        self.ODOM_ROTATION_NOISE = 3  # Odometry model rotation noise
-        self.ODOM_TRANSLATION_NOISE = 2  # Odometry model x axis (forward) noise
-        self.ODOM_DRIFT_NOISE = 7  # Odometry model y axis (side-to-side) noise
+        self.ODOM_ROTATION_NOISE = 1  # Odometry model rotation noise
+        self.ODOM_TRANSLATION_NOISE = 1  # Odometry model x axis (forward) noise
+        self.ODOM_DRIFT_NOISE = 1  # Odometry model y axis (side-to-side) noise
 
         # ----- Sensor model parameters
         self.NUMBER_PREDICTED_READINGS = 20  # Number of readings to predict
@@ -116,9 +116,9 @@ class PFLocaliser(PFLocaliserBase):
         pose_array = PoseArray()
         for _ in range(self.NUMBER_OF_PARTICLES):
             # Add noise to x, y, and orientation
-            noise_x = sample_normal_distribution(0.3) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
-            noise_y = sample_normal_distribution(0.3) * self.ODOM_DRIFT_NOISE  # 0.3 is the variance
-            noise_angle = sample_normal_distribution(0.3) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
+            noise_x = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
+            noise_y = sample_normal_distribution(0.1) * self.ODOM_DRIFT_NOISE  # 0.3 is the variance
+            noise_angle = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
 
             position_x = initialpose.pose.pose.position.x + noise_x  # need to multiply by parameter
             position_y = initialpose.pose.pose.position.y + noise_y  # need to multiply by parameter
@@ -137,12 +137,10 @@ class PFLocaliser(PFLocaliserBase):
             | scan (sensor_msgs.msg.LaserScan): laser scan to use for update
 
          """
-        new_scan = sensor_msgs.msg.LaserScan
         new_cloud = []
-        particle_num = 1
 
-        for i in range(0, particle_num):
-            weight = self.sensor_model.get_weight(self, scan, self.particlecloud[i])
+        for pose in self.particlecloud.poses:
+            weight = self.sensor_model.get_weight(scan, pose)
             new_cloud.append(weight)
 
         self.particleCloud = new_cloud
