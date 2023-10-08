@@ -136,14 +136,12 @@ class PFLocaliser(PFLocaliserBase):
         :Args:
             | scan (sensor_msgs.msg.LaserScan): laser scan to use for update
 
-         """
-        new_cloud = []
+        """
+        weights = []
 
         for pose in self.particlecloud.poses:
             weight = self.sensor_model.get_weight(scan, pose)
-            new_cloud.append(weight)
-
-        self.particleCloud = new_cloud
+            weights.append(weight)
 
     def estimate_pose(self):
         """
