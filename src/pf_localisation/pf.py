@@ -84,6 +84,50 @@ def new_pose(x, y, angle):
 
     return pose
 
+def normalise_list(lst):
+    min_value = min(lst)
+    max_value = max(lst)
+
+    normalized_weights = [(x - min_value) / (max_value - min_value) for x in lst]
+
+    return normalized_weights
+
+
+def create_cdf(weights):
+    num_weights = len(weights)
+    cdf = []
+    cdf.append(weights[0])
+    for i in range(1,num_weights):
+        cdf.append(cdf[i-1] + weights[i])
+    cdf = normalise_list(cdf)
+    return cdf
+
+
+def systematic_resampling(poses, weights):
+    M = len(weights)
+    cdf = create_cdf(weights)
+
+    u = []
+    u.append(np.random.uniform(0, 1/M))
+
+    S = PoseArray() # resampled data
+    i = 0
+    for j in range(0, M):
+        while u[j] > cdf[i]:
+            i = i+1
+
+        noise_x = sample_normal_distribution(0.001) # need to multiply by parameter
+        noise_y = sample_normal_distribution(0.001) # need to multiply by parameter
+        noise_angle = sample_normal_distribution(0.001) # need to multiply by parameter
+
+        position_x = poses[i].position.x + noise_x
+        position_y = poses[i].position.y + noise_y
+        orientation = rotateQuaternion(poses[i].orientation, noise_angle)
+        
+        S.poses.append(new_pose(position_x, position_y, orientation))
+        u.append(u[j] + 1/M)
+    return S
+
 
 def smooothing_kernel(radius, distance):
     """Generate smoothing from point, given radius"""
@@ -101,9 +145,9 @@ class PFLocaliser(PFLocaliserBase):
         super(PFLocaliser, self).__init__()
 
         # ----- Set motion model parameters (alpha values)
-        self.ODOM_ROTATION_NOISE = 3  # Odometry model rotation noise
-        self.ODOM_TRANSLATION_NOISE = 2  # Odometry model x axis (forward) noise
-        self.ODOM_DRIFT_NOISE = 7  # Odometry model y axis (side-to-side) noise
+        self.ODOM_ROTATION_NOISE = 1  # Odometry model rotation noise
+        self.ODOM_TRANSLATION_NOISE = 1  # Odometry model x axis (forward) noise
+        self.ODOM_DRIFT_NOISE = 1  # Odometry model y axis (side-to-side) noise
 
         # ----- Sensor model parameters
         self.NUMBER_PREDICTED_READINGS = 20  # Number of readings to predict
@@ -188,14 +232,13 @@ class PFLocaliser(PFLocaliserBase):
         pose_array = PoseArray()
         for i in range(self.NUMBER_OF_PARTICLES):
             # Add noise to x, y, and orientation
-            noise_x = sample_normal_distribution(0.3) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
-            noise_y = sample_normal_distribution(0.3) * self.ODOM_DRIFT_NOISE  # 0.3 is the variance
-            noise_angle = sample_normal_distribution(0.3) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
+            noise_x = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE
+            noise_y = sample_normal_distribution(0.1) * self.ODOM_DRIFT_NOISE
+            noise_angle = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE
 
-            position_x = initialpose.pose.pose.position.x + noise_x  # need to multiply by parameter
-            position_y = initialpose.pose.pose.position.y + noise_y  # need to multiply by parameter
-            orientation = rotateQuaternion(initialpose.pose.pose.orientation,
-                                           noise_angle)  # need to multiply by parameter
+            position_x = initialpose.pose.pose.position.x + noise_x
+            position_y = initialpose.pose.pose.position.y + noise_y
+            orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)
 
             pose_array.poses.append(new_pose(position_x, position_y, orientation))
 
@@ -209,17 +252,16 @@ class PFLocaliser(PFLocaliserBase):
         :Args:
             | scan (sensor_msgs.msg.LaserScan): laser scan to use for update
 
-         """
-        new_scan = sensor_msgs.msg.LaserScan
-        new_cloud = []
-        particle_num = 1
+        """
+        weights = []
+        for pose in self.particlecloud.poses:
+            weight = self.sensor_model.get_weight(scan, pose)
+            weights.append(weight)
 
-        for i in range(0, particle_num):
-            weight = self.sensor_model.get_weight(self, scan, self.particlecloud[i])
-            new_cloud.append(weight)
+        resampled_poses = systematic_resampling(self.particlecloud.poses, weights)
 
-        self.particleCloud = new_cloud
-        pass
+        self.particlecloud = resampled_poses
+
 
     def estimate_pose(self):
         """
