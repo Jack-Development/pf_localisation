@@ -120,9 +120,9 @@ class PFLocaliser(PFLocaliserBase):
             noise_y = sample_normal_distribution(0.1) * self.ODOM_DRIFT_NOISE
             noise_angle = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE
 
-            position_x = initialpose.pose.pose.position.x + noise_x  # need to multiply by parameter
-            position_y = initialpose.pose.pose.position.y + noise_y  # need to multiply by parameter
-            orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)  # need to multiply by parameter
+            position_x = initialpose.pose.pose.position.x + noise_x
+            position_y = initialpose.pose.pose.position.y + noise_y
+            orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)
 
             pose_array.poses.append(new_pose(position_x, position_y, orientation))
 
