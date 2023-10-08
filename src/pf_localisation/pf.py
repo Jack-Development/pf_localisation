@@ -1,4 +1,6 @@
 import math
+import time
+import concurrent.futures
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -9,7 +11,7 @@ from .pf_base import PFLocaliserBase
 from .util import rotateQuaternion, getHeading
 
 """ Enable for debug functions """
-isDebug = False
+isDebug = True
 
 
 # --------------------------------------------------------------------- Utility Functions
@@ -83,27 +85,11 @@ def new_pose(x, y, angle):
     return pose
 
 
-def smooothing_kernel(radius_squared, distance_squared):
+def smooothing_kernel(radius, distance):
     """Generate smoothing from point, given radius"""
-    return max(0, radius_squared - distance_squared) ** 3
-
-
-def density_at_point(target_point, particle_array):
-    """Give density at given point"""
-    # ----- Tuning Parameters
-    mass = 1
-    smoothing_radius = 10
-
-    density = 0
-    smoothing_radius_squared = smoothing_radius ** 2
-    for particle in particle_array:
-        dx = particle.position.x - target_point.x
-        dy = particle.position.y - target_point.y
-        distance_squared = dx ** 2 + dy ** 2
-        influence = smooothing_kernel(smoothing_radius_squared, distance_squared)
-        density += mass * influence
-
-    return density
+    volume = math.pi * (radius ** 8) / 4
+    value = max(0, radius ** 2 - distance ** 2)
+    return value ** 3 / volume
 
 
 # --------------------------------------------------------------------- Main Class
@@ -126,6 +112,7 @@ class PFLocaliser(PFLocaliserBase):
         self.NUMBER_OF_PARTICLES = 200
         self.grid_map = []
         self.density_map = []
+        self.density_grid = None
 
     def test_density_function(self):
         pose_array = PoseArray()
@@ -136,7 +123,25 @@ class PFLocaliser(PFLocaliserBase):
         self.particlecloud = pose_array
         self.generate_density_map()
 
+    def density_at_point(self, target_point, particle_array):
+        """Give density at given point"""
+        # ----- Tuning Parameters
+        mass = 1
+        smoothing_radius = 10
+
+        density = 0
+        for particle in particle_array:
+            dx = particle.position.x - target_point.x
+            dy = particle.position.y - target_point.y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+            influence = smooothing_kernel(smoothing_radius, distance)
+            density += mass * influence
+
+        return density
+
     def generate_density_map(self):
+        time_start = time.perf_counter()
+
         width, height = len(self.grid_map[0]), len(self.grid_map)
 
         density_matrix = np.zeros((width, height))
@@ -144,13 +149,16 @@ class PFLocaliser(PFLocaliserBase):
 
         for i, j in zip(*valid_points):
             target_point = grid_to_pos(i, j)
-            density_matrix[i, j] = density_at_point(target_point, self.particlecloud.poses)
+            density_matrix[i, j] = self.density_at_point(target_point, self.particlecloud.poses)
 
         max_density = np.max(density_matrix)
         if max_density != 0:
             density_matrix /= max_density
 
         self.density_map = density_matrix
+
+        time_end = time.perf_counter()
+        print(f"Generated density map in {time_end - time_start:0.4f} seconds")
 
         if isDebug:
             plt.imshow(density_matrix, cmap='gray_r')
@@ -173,13 +181,12 @@ class PFLocaliser(PFLocaliserBase):
         """
 
         self.grid_map = create_grid(self.occupancy_map)
-
         if isDebug:
             visualize_grid(self.grid_map)
             self.test_density_function()
 
         pose_array = PoseArray()
-        for _ in range(self.NUMBER_OF_PARTICLES):
+        for i in range(self.NUMBER_OF_PARTICLES):
             # Add noise to x, y, and orientation
             noise_x = sample_normal_distribution(0.3) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
             noise_y = sample_normal_distribution(0.3) * self.ODOM_DRIFT_NOISE  # 0.3 is the variance
