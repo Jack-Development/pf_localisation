@@ -1,6 +1,5 @@
 import math
 import time
-import concurrent.futures
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -84,48 +83,60 @@ def new_pose(x, y, angle):
 
     return pose
 
+
 def normalise_list(lst):
-    min_value = min(lst)
-    max_value = max(lst)
-
+    """Normalise a given list between 0 and 1"""
+    min_value, max_value = min(lst), max(lst)
     normalized_weights = [(x - min_value) / (max_value - min_value) for x in lst]
-
     return normalized_weights
 
 
 def create_cdf(weights):
+    """Create a cumulative distribution"""
     num_weights = len(weights)
-    cdf = []
-    cdf.append(weights[0])
-    for i in range(1,num_weights):
-        cdf.append(cdf[i-1] + weights[i])
+    cdf = [weights[0]]
+    # Each new entry is equivalent to previous weight + current weight
+    for i in range(1, num_weights):
+        cdf.append(cdf[i - 1] + weights[i])
     cdf = normalise_list(cdf)
+
+    if isDebug:
+        plt.plot(cdf)
+        plt.xlabel('Index')
+        plt.ylabel('Probability')
+        plt.title('Cumulative Distribution Function (CDF)')
+        plt.grid(True)
+        plt.show()
+
     return cdf
 
 
 def systematic_resampling(poses, weights):
+    """Resample poses based on weights"""
     M = len(weights)
     cdf = create_cdf(weights)
+    # Start in random part of first section
+    u = [np.random.uniform(0, 1 / M)]
 
-    u = []
-    u.append(np.random.uniform(0, 1/M))
-
-    S = PoseArray() # resampled data
+    S = PoseArray()  # resampled data
     i = 0
     for j in range(0, M):
+        # Check if next offset is in next section
         while u[j] > cdf[i]:
-            i = i+1
+            i += 1
 
-        noise_x = sample_normal_distribution(0.001) # need to multiply by parameter
-        noise_y = sample_normal_distribution(0.001) # need to multiply by parameter
-        noise_angle = sample_normal_distribution(0.001) # need to multiply by parameter
+        # Random noise for each parameter
+        noise_x = sample_normal_distribution(0.001)  # need to multiply by parameter
+        noise_y = sample_normal_distribution(0.001)  # need to multiply by parameter
+        noise_angle = sample_normal_distribution(0.001)  # need to multiply by parameter
 
+        # Add noise to parameter
         position_x = poses[i].position.x + noise_x
         position_y = poses[i].position.y + noise_y
         orientation = rotateQuaternion(poses[i].orientation, noise_angle)
-        
+
         S.poses.append(new_pose(position_x, position_y, orientation))
-        u.append(u[j] + 1/M)
+        u.append(u[j] + 1 / M)
     return S
 
 
@@ -168,7 +179,7 @@ class PFLocaliser(PFLocaliserBase):
         self.generate_density_map()
 
     def density_at_point(self, target_point, particle_array):
-        """Give density at given point"""
+        """Get density at given point"""
         # ----- Tuning Parameters
         mass = 1
         smoothing_radius = 10
@@ -184,6 +195,7 @@ class PFLocaliser(PFLocaliserBase):
         return density
 
     def generate_density_map(self):
+        """Create a particle density map"""
         time_start = time.perf_counter()
 
         width, height = len(self.grid_map[0]), len(self.grid_map)
@@ -227,7 +239,7 @@ class PFLocaliser(PFLocaliserBase):
         self.grid_map = create_grid(self.occupancy_map)
         if isDebug:
             visualize_grid(self.grid_map)
-            self.test_density_function()
+            # self.test_density_function()
 
         pose_array = PoseArray()
         for i in range(self.NUMBER_OF_PARTICLES):
@@ -261,7 +273,6 @@ class PFLocaliser(PFLocaliserBase):
         resampled_poses = systematic_resampling(self.particlecloud.poses, weights)
 
         self.particlecloud = resampled_poses
-
 
     def estimate_pose(self):
         """
