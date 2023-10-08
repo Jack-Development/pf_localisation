@@ -6,8 +6,8 @@ from geometry_msgs.msg import Pose, PoseArray, Quaternion, Point
 from sensor_msgs.msg import LaserScan
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
-from pf_base import PFLocaliserBase
-from util import rotateQuaternion, getHeading
+from . pf_base import PFLocaliserBase
+from . util import rotateQuaternion, getHeading
 
 """ Enable for debug functions """
 isDebug = False
@@ -261,9 +261,9 @@ class PFLocaliser(PFLocaliserBase):
             noise_y = sample_normal_distribution(0.3) * self.ODOM_DRIFT_NOISE  # 0.3 is the variance
             noise_angle = sample_normal_distribution(0.3) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
 
-            position_x = initialpose.position.x + noise_x  # need to multiply by parameter
-            position_y = initialpose.position.y + noise_y  # need to multiply by parameter
-            orientation = rotateQuaternion(initialpose.orientation, noise_angle)  # need to multiply by parameter
+            position_x = initialpose.pose.pose.position.x + noise_x  # need to multiply by parameter
+            position_y = initialpose.pose.pose.position.y + noise_y  # need to multiply by parameter
+            orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)  # need to multiply by parameter
 
             pose_array.poses.append(new_pose(position_x, position_y, orientation))
 
@@ -280,16 +280,12 @@ class PFLocaliser(PFLocaliserBase):
 
          """
         particle_num = len(self.particlecloud.poses)
-        """MAKE SURE TO READD POSE CALLUM"""
-        print(particle_num)
         new_cloud = []
 
         for i in range(0, particle_num):
             weight = self.sensor_model.get_weight(scan, self.particlecloud.poses[i])
-            print(weight)
             new_cloud.append(weight)
 
-        print(new_cloud)
         self.particleCloud = new_cloud
         pass
 
@@ -334,9 +330,8 @@ class PFLocaliser(PFLocaliserBase):
 def main():
     """Start example localiser and test particle_cloud"""
     localiser = PFLocaliser()
-    pose_array = localiser.initialise_particle_cloud(new_pose(10, 5, 0))
+    localiser.initialise_particle_cloud(new_pose(10, 5, 0))
     laser_scan = laser_scan_setup_test()
-    print(laser_scan)
     localiser.update_particle_cloud(laser_scan)
 
 
