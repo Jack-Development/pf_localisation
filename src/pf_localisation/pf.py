@@ -144,7 +144,6 @@ class PFLocaliser(PFLocaliserBase):
             new_cloud.append(weight)
 
         self.particleCloud = new_cloud
-        pass
 
     def estimate_pose(self):
         """
