@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from geometry_msgs.msg import Pose, PoseArray, Quaternion, Point
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
-from . pf_base import PFLocaliserBase
-from . util import rotateQuaternion, getHeading
+from .pf_base import PFLocaliserBase
+from .util import rotateQuaternion, getHeading
 
 """ Enable for debug functions """
 isDebug = False
@@ -39,13 +39,23 @@ def pos_to_grid(pos_x, pos_y):
 
     x_prime = m * pos_x + c
     y_prime = -m * pos_y + c
-    return x_prime, y_prime
+    return Point(int(x_prime), int(y_prime), 0)
+
+
+def grid_to_pos(x_prime, y_prime):
+    """Convert grid coordinates to position"""
+    m = 20
+    c = 300
+
+    pos_x = (x_prime - c) / m
+    pos_y = (c - y_prime) / m
+    return Point(pos_x, pos_y, 0)
 
 
 def is_valid(pose, grid):
     """Check if a pose is valid within a given grid"""
     grid_pos = pos_to_grid(pose.position.x, pose.position.y)
-    return grid[grid_pos[0]][grid_pos[1]] == 0
+    return grid[grid_pos.x][grid_pos.y] == 0
 
 
 def create_grid(grid):
@@ -73,6 +83,29 @@ def new_pose(x, y, angle):
     return pose
 
 
+def smooothing_kernel(radius_squared, distance_squared):
+    """Generate smoothing from point, given radius"""
+    return max(0, radius_squared - distance_squared) ** 3
+
+
+def density_at_point(target_point, particle_array):
+    """Give density at given point"""
+    # ----- Tuning Parameters
+    mass = 1
+    smoothing_radius = 10
+
+    density = 0
+    smoothing_radius_squared = smoothing_radius ** 2
+    for particle in particle_array:
+        dx = particle.position.x - target_point.x
+        dy = particle.position.y - target_point.y
+        distance_squared = dx ** 2 + dy ** 2
+        influence = smooothing_kernel(smoothing_radius_squared, distance_squared)
+        density += mass * influence
+
+    return density
+
+
 # --------------------------------------------------------------------- Main Class
 
 class PFLocaliser(PFLocaliserBase):
@@ -92,6 +125,37 @@ class PFLocaliser(PFLocaliserBase):
         # ----- Particle cloud configuration
         self.NUMBER_OF_PARTICLES = 200
         self.grid_map = []
+        self.density_map = []
+
+    def test_density_function(self):
+        pose_array = PoseArray()
+        pose_array.poses.append(new_pose(6, 4, 0))
+        pose_array.poses.append(new_pose(7, 7, 0))
+        pose_array.poses.append(new_pose(3, 0, 0))
+
+        self.particlecloud = pose_array
+        self.generate_density_map()
+
+    def generate_density_map(self):
+        width, height = len(self.grid_map[0]), len(self.grid_map)
+
+        density_matrix = np.zeros((width, height))
+        valid_points = np.where(self.grid_map == 0)
+
+        for i, j in zip(*valid_points):
+            target_point = grid_to_pos(i, j)
+            density_matrix[i, j] = density_at_point(target_point, self.particlecloud.poses)
+
+        max_density = np.max(density_matrix)
+        if max_density != 0:
+            density_matrix /= max_density
+
+        self.density_map = density_matrix
+
+        if isDebug:
+            plt.imshow(density_matrix, cmap='gray_r')
+            plt.colorbar()
+            plt.show()
 
     def initialise_particle_cloud(self, initialpose):
         """
@@ -108,10 +172,11 @@ class PFLocaliser(PFLocaliserBase):
             | (geometry_msgs.msg.PoseArray) poses of the particles
         """
 
-        grid_map = create_grid(self.occupancy_map)
+        self.grid_map = create_grid(self.occupancy_map)
 
         if isDebug:
-            visualize_grid(grid_map)
+            visualize_grid(self.grid_map)
+            self.test_density_function()
 
         pose_array = PoseArray()
         for _ in range(self.NUMBER_OF_PARTICLES):
@@ -122,7 +187,8 @@ class PFLocaliser(PFLocaliserBase):
 
             position_x = initialpose.pose.pose.position.x + noise_x  # need to multiply by parameter
             position_y = initialpose.pose.pose.position.y + noise_y  # need to multiply by parameter
-            orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)  # need to multiply by parameter
+            orientation = rotateQuaternion(initialpose.pose.pose.orientation,
+                                           noise_angle)  # need to multiply by parameter
 
             pose_array.poses.append(new_pose(position_x, position_y, orientation))
 
