@@ -73,6 +73,54 @@ def new_pose(x, y, angle):
     return pose
 
 
+def normalise_list(lst):
+    min_value = min(lst)
+    max_value = max(lst)
+
+    normalized_weights = [(x - min_value) / (max_value - min_value) for x in lst]
+
+    return normalized_weights
+
+
+def create_cdf(weights):
+    num_weights = len(weights)
+    cdf = []
+    cdf.append(weights[0])
+    for i in range(1,num_weights):
+        cdf.append(cdf[i-1] + weights[i])
+    cdf = normalise_list(cdf)
+    return cdf
+
+
+def systematic_resampling(poses, weights):
+    M = len(weights)
+    cdf = create_cdf(weights)
+
+    u = []
+    u.append(np.random.uniform(0, 1/M))
+
+    S = PoseArray() # resampled data
+    i = 0
+    for j in range(0, M):
+        while u[j] > cdf[i]:
+            i = i+1
+
+        noise_x = sample_normal_distribution(0.001) # need to multiply by parameter
+        noise_y = sample_normal_distribution(0.001) # need to multiply by parameter
+        noise_angle = sample_normal_distribution(0.001) # need to multiply by parameter
+
+        position_x = poses[i].position.x + noise_x
+        position_y = poses[i].position.y + noise_y
+        orientation = rotateQuaternion(poses[i].orientation, noise_angle)
+        
+        S.poses.append(new_pose(position_x, position_y, orientation))
+        u.append(u[j] + 1/M)
+    return S
+
+
+
+    
+
 # --------------------------------------------------------------------- Main Class
 
 class PFLocaliser(PFLocaliserBase):
@@ -138,10 +186,14 @@ class PFLocaliser(PFLocaliserBase):
 
         """
         weights = []
-
         for pose in self.particlecloud.poses:
             weight = self.sensor_model.get_weight(scan, pose)
             weights.append(weight)
+
+        resampled_poses = systematic_resampling(self.particlecloud.poses, weights)
+
+        self.particlecloud = resampled_poses
+
 
     def estimate_pose(self):
         """
