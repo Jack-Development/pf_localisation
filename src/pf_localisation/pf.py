@@ -11,7 +11,7 @@ from .pf_base import PFLocaliserBase
 from .util import rotateQuaternion, getHeading
 
 """ Enable for debug functions """
-isDebug = True
+isDebug = False
 
 
 # --------------------------------------------------------------------- Utility Functions
