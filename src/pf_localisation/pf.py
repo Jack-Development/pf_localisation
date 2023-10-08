@@ -116,9 +116,9 @@ class PFLocaliser(PFLocaliserBase):
         pose_array = PoseArray()
         for _ in range(self.NUMBER_OF_PARTICLES):
             # Add noise to x, y, and orientation
-            noise_x = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
-            noise_y = sample_normal_distribution(0.1) * self.ODOM_DRIFT_NOISE  # 0.3 is the variance
-            noise_angle = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
+            noise_x = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE
+            noise_y = sample_normal_distribution(0.1) * self.ODOM_DRIFT_NOISE
+            noise_angle = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE
 
             position_x = initialpose.pose.pose.position.x + noise_x  # need to multiply by parameter
             position_y = initialpose.pose.pose.position.y + noise_y  # need to multiply by parameter
