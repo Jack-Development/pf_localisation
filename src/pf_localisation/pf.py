@@ -1,12 +1,14 @@
 import math
+import time
+import concurrent.futures
 import numpy as np
 import matplotlib.pyplot as plt
 
 from geometry_msgs.msg import Pose, PoseArray, Quaternion, Point
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
-from . pf_base import PFLocaliserBase
-from . util import rotateQuaternion, getHeading
+from .pf_base import PFLocaliserBase
+from .util import rotateQuaternion, getHeading
 
 """ Enable for debug functions """
 isDebug = False
@@ -39,13 +41,23 @@ def pos_to_grid(pos_x, pos_y):
 
     x_prime = m * pos_x + c
     y_prime = -m * pos_y + c
-    return x_prime, y_prime
+    return Point(int(x_prime), int(y_prime), 0)
+
+
+def grid_to_pos(x_prime, y_prime):
+    """Convert grid coordinates to position"""
+    m = 20
+    c = 300
+
+    pos_x = (x_prime - c) / m
+    pos_y = (c - y_prime) / m
+    return Point(pos_x, pos_y, 0)
 
 
 def is_valid(pose, grid):
     """Check if a pose is valid within a given grid"""
     grid_pos = pos_to_grid(pose.position.x, pose.position.y)
-    return grid[grid_pos[0]][grid_pos[1]] == 0
+    return grid[grid_pos.x][grid_pos.y] == 0
 
 
 def create_grid(grid):
@@ -73,6 +85,13 @@ def new_pose(x, y, angle):
     return pose
 
 
+def smooothing_kernel(radius, distance):
+    """Generate smoothing from point, given radius"""
+    volume = math.pi * (radius ** 8) / 4
+    value = max(0, radius ** 2 - distance ** 2)
+    return value ** 3 / volume
+
+
 # --------------------------------------------------------------------- Main Class
 
 class PFLocaliser(PFLocaliserBase):
@@ -92,6 +111,59 @@ class PFLocaliser(PFLocaliserBase):
         # ----- Particle cloud configuration
         self.NUMBER_OF_PARTICLES = 200
         self.grid_map = []
+        self.density_map = []
+        self.density_grid = None
+
+    def test_density_function(self):
+        pose_array = PoseArray()
+        pose_array.poses.append(new_pose(6, 4, 0))
+        pose_array.poses.append(new_pose(7, 7, 0))
+        pose_array.poses.append(new_pose(3, 0, 0))
+
+        self.particlecloud = pose_array
+        self.generate_density_map()
+
+    def density_at_point(self, target_point, particle_array):
+        """Give density at given point"""
+        # ----- Tuning Parameters
+        mass = 1
+        smoothing_radius = 10
+
+        density = 0
+        for particle in particle_array:
+            dx = particle.position.x - target_point.x
+            dy = particle.position.y - target_point.y
+            distance = math.sqrt(dx ** 2 + dy ** 2)
+            influence = smooothing_kernel(smoothing_radius, distance)
+            density += mass * influence
+
+        return density
+
+    def generate_density_map(self):
+        time_start = time.perf_counter()
+
+        width, height = len(self.grid_map[0]), len(self.grid_map)
+
+        density_matrix = np.zeros((width, height))
+        valid_points = np.where(self.grid_map == 0)
+
+        for i, j in zip(*valid_points):
+            target_point = grid_to_pos(i, j)
+            density_matrix[i, j] = self.density_at_point(target_point, self.particlecloud.poses)
+
+        max_density = np.max(density_matrix)
+        if max_density != 0:
+            density_matrix /= max_density
+
+        self.density_map = density_matrix
+
+        time_end = time.perf_counter()
+        print(f"Generated density map in {time_end - time_start:0.4f} seconds")
+
+        if isDebug:
+            plt.imshow(density_matrix, cmap='gray_r')
+            plt.colorbar()
+            plt.show()
 
     def initialise_particle_cloud(self, initialpose):
         """
@@ -108,13 +180,13 @@ class PFLocaliser(PFLocaliserBase):
             | (geometry_msgs.msg.PoseArray) poses of the particles
         """
 
-        grid_map = create_grid(self.occupancy_map)
-
+        self.grid_map = create_grid(self.occupancy_map)
         if isDebug:
-            visualize_grid(grid_map)
+            visualize_grid(self.grid_map)
+            self.test_density_function()
 
         pose_array = PoseArray()
-        for _ in range(self.NUMBER_OF_PARTICLES):
+        for i in range(self.NUMBER_OF_PARTICLES):
             # Add noise to x, y, and orientation
             noise_x = sample_normal_distribution(0.3) * self.ODOM_TRANSLATION_NOISE  # 0.3 is the variance
             noise_y = sample_normal_distribution(0.3) * self.ODOM_DRIFT_NOISE  # 0.3 is the variance
@@ -122,7 +194,8 @@ class PFLocaliser(PFLocaliserBase):
 
             position_x = initialpose.pose.pose.position.x + noise_x  # need to multiply by parameter
             position_y = initialpose.pose.pose.position.y + noise_y  # need to multiply by parameter
-            orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)  # need to multiply by parameter
+            orientation = rotateQuaternion(initialpose.pose.pose.orientation,
+                                           noise_angle)  # need to multiply by parameter
 
             pose_array.poses.append(new_pose(position_x, position_y, orientation))
 
