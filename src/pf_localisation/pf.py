@@ -249,7 +249,7 @@ class PFLocaliser(PFLocaliserBase):
             weight = self.sensor_model.get_weight(scan, pose)
             weights.append(weight)
 
-        random_particles_count = 10
+        random_particles_count = 20
 
         resampled_poses = self.systematic_resampling(self.particlecloud.poses, weights, random_particles_count)
 
