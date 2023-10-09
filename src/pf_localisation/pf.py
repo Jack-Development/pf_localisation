@@ -399,8 +399,8 @@ class PFLocaliser(PFLocaliserBase):
             sin_angle_sum += math.sin(angle)
             cos_angle_sum += math.cos(angle)
         
-        x_mean = x_sum / particle_count
-        y_mean = y_sum / particle_count
+        x_mean = x_sum / len(largest_cluster)
+        y_mean = y_sum / len(largest_cluster)
         angle_mean = math.atan2(sin_angle_sum, cos_angle_sum)
         
         return new_pose(x_mean, y_mean, angle_mean)
