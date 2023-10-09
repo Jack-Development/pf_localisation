@@ -54,7 +54,11 @@ def grid_to_pos(x_prime, y_prime):
 
 def is_valid(pose, grid):
     """Check if a pose is valid within a given grid"""
+    print(pose.position.x, pose.position.y)
     grid_pos = pos_to_grid(pose.position.x, pose.position.y)
+    grid_pos.x = clamp(grid_pos.x, 0, 602)
+    grid_pos.y = clamp(grid_pos.y, 0, 602)
+    print(grid_pos)
     return grid[grid_pos.x][grid_pos.y] == 0
 
 
@@ -123,6 +127,9 @@ def smooothing_kernel(radius, distance):
     value = max(0, radius ** 2 - distance ** 2)
     return value ** 3 / volume
 
+def clamp(value, minimum, maximum):
+    """Clamp a value between -15 and 15."""
+    return max(minimum, min(maximum, value))
 
 # --------------------------------------------------------------------- Main Class
 
@@ -222,17 +229,28 @@ class PFLocaliser(PFLocaliserBase):
             # self.test_density_function()
 
         pose_array = PoseArray()
-        for i in range(self.NUMBER_PREDICTED_READINGS):
-            # Add noise to x, y, and orientation
-            noise_x = sample_normal_distribution(0.1) * self.ODOM_TRANSLATION_NOISE
-            noise_y = sample_normal_distribution(0.1) * self.ODOM_DRIFT_NOISE
-            noise_angle = sample_normal_distribution(0.1) * self.ODOM_ROTATION_NOISE
+        MAX_RETRIES = 1000
+        for _ in range(self.NUMBER_OF_PARTICLES):
+            insert_pose = Pose()
+            retry_count = 0
 
-            position_x = initialpose.pose.pose.position.x + noise_x
-            position_y = initialpose.pose.pose.position.y + noise_y
-            orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)
+            while retry_count < MAX_RETRIES:
+                deviation_offset = 0.1 + (0.1 * retry_count)
 
-            pose_array.poses.append(new_pose(position_x, position_y, orientation))
+                # Add noise to x, y, and orientation
+                noise_x = sample_normal_distribution(deviation_offset) * self.ODOM_TRANSLATION_NOISE
+                noise_y = sample_normal_distribution(deviation_offset) * self.ODOM_DRIFT_NOISE
+                noise_angle = sample_normal_distribution(deviation_offset) * self.ODOM_ROTATION_NOISE
+
+                insert_pose.position.x = initialpose.pose.pose.position.x + noise_x
+                insert_pose.position.y = initialpose.pose.pose.position.y + noise_y
+                insert_pose.orientation = rotateQuaternion(initialpose.pose.pose.orientation, noise_angle)
+
+                if is_valid(insert_pose, self.grid_map):
+                    break
+                retry_count += 1
+
+            pose_array.poses.append(insert_pose)
 
         return pose_array
 
@@ -270,22 +288,31 @@ class PFLocaliser(PFLocaliserBase):
 
         S = PoseArray()  # resampled data
         i = 0
+        MAX_RETRIES = 1000
         for j in range(0, M):
             # Check if next offset is in next section
             while u[j] > cdf[i]:
                 i += 1
 
-            # Random noise for each parameter
-            noise_x = sample_normal_distribution(0.01) * self.ODOM_TRANSLATION_NOISE
-            noise_y = sample_normal_distribution(0.01) * self.ODOM_DRIFT_NOISE
-            noise_angle = sample_normal_distribution(0.01) * self.ODOM_ROTATION_NOISE
+            retry_count = 0
+            insert_pose = Pose()
+            while retry_count < MAX_RETRIES:
+                deviation_offset = 0.001 + (0.0001 * retry_count)
+                # Random noise for each parameter
+                noise_x = sample_normal_distribution(0.01) * self.ODOM_TRANSLATION_NOISE
+                noise_y = sample_normal_distribution(0.01) * self.ODOM_DRIFT_NOISE
+                noise_angle = sample_normal_distribution(0.01) * self.ODOM_ROTATION_NOISE
 
-            # Add noise to parameter
-            position_x = poses[i].position.x + noise_x
-            position_y = poses[i].position.y + noise_y
-            orientation = rotateQuaternion(poses[i].orientation, noise_angle)
+                # Add noise to parameter
+                insert_pose.position.x = poses[i].position.x + noise_x
+                insert_pose.position.y = poses[i].position.y + noise_y
+                insert_pose.orientation = rotateQuaternion(poses[i].orientation, noise_angle)
 
-            S.poses.append(new_pose(position_x, position_y, orientation))
+                if is_valid(insert_pose, self.grid_map):
+                    break
+                retry_count += 1
+
+            S.poses.append(insert_pose)
             u.append(u[j] + 1 / M)
 
         random_points = np.random.choice(self.valid_map, size=random_particles_count)
