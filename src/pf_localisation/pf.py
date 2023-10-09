@@ -156,6 +156,8 @@ class PFLocaliser(PFLocaliserBase):
         self.density_map = []
         self.density_grid = None
 
+        self.MAX_RETRIES = 100
+
     def test_density_function(self):
         pose_array = PoseArray()
         pose_array.poses.append(new_pose(6, 4, 0))
@@ -230,12 +232,11 @@ class PFLocaliser(PFLocaliserBase):
         # self.test_density_function()
 
         pose_array = PoseArray()
-        MAX_RETRIES = 1000
         for _ in range(self.NUMBER_PREDICTED_READINGS):
             insert_pose = Pose()
             retry_count = 0
 
-            while retry_count < MAX_RETRIES:
+            while retry_count < self.MAX_RETRIES:
                 deviation_offset = 0.1 + (0.1 * retry_count)
 
                 # Add noise to x, y, and orientation
@@ -289,7 +290,6 @@ class PFLocaliser(PFLocaliserBase):
 
         S = PoseArray()  # resampled data
         i = 0
-        MAX_RETRIES = 1000
         for j in range(0, M):
             # Check if next offset is in next section
             while u[j] > cdf[i]:
@@ -297,7 +297,7 @@ class PFLocaliser(PFLocaliserBase):
 
             retry_count = 0
             insert_pose = Pose()
-            while retry_count < MAX_RETRIES:
+            while retry_count < self.MAX_RETRIES:
                 deviation_offset = 0.001 + (0.0001 * retry_count)
                 # Random noise for each parameter
                 noise_x = sample_normal_distribution(0.01) * self.ODOM_TRANSLATION_NOISE
