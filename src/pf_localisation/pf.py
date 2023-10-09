@@ -1,4 +1,5 @@
 import math
+import random
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,20 +37,18 @@ def visualize_grid(grid):
 def pos_to_grid(pos_x, pos_y):
     """Convert position to grid coordinates"""
     m = 20
-    c = 300
 
-    x_prime = m * pos_x + c
-    y_prime = -m * pos_y + c
+    x_prime = m * pos_x
+    y_prime = m * pos_y
     return Point(int(x_prime), int(y_prime), 0)
 
 
 def grid_to_pos(x_prime, y_prime):
     """Convert grid coordinates to position"""
     m = 20
-    c = 300
 
-    pos_x = (x_prime - c) / m
-    pos_y = (c - y_prime) / m
+    pos_x = x_prime / m
+    pos_y = y_prime / m
     return Point(pos_x, pos_y, 0)
 
 
@@ -64,6 +63,13 @@ def create_grid(grid):
     np_grid = np.array(grid.data).flatten()
     return np_grid.reshape(grid.info.width, grid.info.height).transpose()
 
+
+def get_valid_grid(grid):
+    """Get all positions where the grid is 0"""
+    np_grid = np.array(grid)
+    valid_points = list(zip(*np.where(np_grid == 0)))
+
+    return [grid_to_pos(x, y) for x, y in valid_points]
 
 def sample_normal_distribution(variance):
     """Sample from a normal distribution"""
@@ -111,35 +117,6 @@ def create_cdf(weights):
     return cdf
 
 
-def systematic_resampling(poses, weights):
-    """Resample poses based on weights"""
-    M = len(weights)
-    cdf = create_cdf(weights)
-    # Start in random part of first section
-    u = [np.random.uniform(0, 1 / M)]
-
-    S = PoseArray()  # resampled data
-    i = 0
-    for j in range(0, M):
-        # Check if next offset is in next section
-        while u[j] > cdf[i]:
-            i += 1
-
-        # Random noise for each parameter
-        noise_x = sample_normal_distribution(0.001)  # need to multiply by parameter
-        noise_y = sample_normal_distribution(0.001)  # need to multiply by parameter
-        noise_angle = sample_normal_distribution(0.001)  # need to multiply by parameter
-
-        # Add noise to parameter
-        position_x = poses[i].position.x + noise_x
-        position_y = poses[i].position.y + noise_y
-        orientation = rotateQuaternion(poses[i].orientation, noise_angle)
-
-        S.poses.append(new_pose(position_x, position_y, orientation))
-        u.append(u[j] + 1 / M)
-    return S
-
-
 def smooothing_kernel(radius, distance):
     """Generate smoothing from point, given radius"""
     volume = math.pi * (radius ** 8) / 4
@@ -166,6 +143,7 @@ class PFLocaliser(PFLocaliserBase):
         # ----- Particle cloud configuration
         self.NUMBER_OF_PARTICLES = 200
         self.grid_map = []
+        self.valid_map = []
         self.density_map = []
         self.density_grid = None
 
@@ -237,6 +215,7 @@ class PFLocaliser(PFLocaliserBase):
         """
 
         self.grid_map = create_grid(self.occupancy_map)
+        self.valid_map = get_valid_grid(self.grid_map)
         if isDebug:
             visualize_grid(self.grid_map)
             # self.test_density_function()
@@ -270,9 +249,44 @@ class PFLocaliser(PFLocaliserBase):
             weight = self.sensor_model.get_weight(scan, pose)
             weights.append(weight)
 
-        resampled_poses = systematic_resampling(self.particlecloud.poses, weights)
+        random_particles_count = 10
+
+        resampled_poses = self.systematic_resampling(self.particlecloud.poses, weights, random_particles_count)
 
         self.particlecloud = resampled_poses
+
+    def systematic_resampling(self, poses, weights, random_particles_count):
+        """Resample poses based on weights"""
+        M = max(0, len(weights) - random_particles_count)
+        cdf = create_cdf(weights)
+        # Start in random part of first section
+        u = [np.random.uniform(0, 1 / M)]
+
+        S = PoseArray()  # resampled data
+        i = 0
+        for j in range(0, M):
+            # Check if next offset is in next section
+            while u[j] > cdf[i]:
+                i += 1
+
+            # Random noise for each parameter
+            noise_x = sample_normal_distribution(0.001)  # need to multiply by parameter
+            noise_y = sample_normal_distribution(0.001)  # need to multiply by parameter
+            noise_angle = sample_normal_distribution(0.001)  # need to multiply by parameter
+
+            # Add noise to parameter
+            position_x = poses[i].position.x + noise_x
+            position_y = poses[i].position.y + noise_y
+            orientation = rotateQuaternion(poses[i].orientation, noise_angle)
+
+            S.poses.append(new_pose(position_x, position_y, orientation))
+            u.append(u[j] + 1 / M)
+
+        random_points = np.random.choice(self.valid_map, size=random_particles_count)
+
+        for point in random_points:
+            S.poses.append(new_pose(point.x, point.y, random.uniform(0, math.pi * 2)))
+        return S
 
     def estimate_pose(self):
         """
