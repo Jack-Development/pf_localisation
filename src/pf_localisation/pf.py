@@ -311,24 +311,98 @@ class PFLocaliser(PFLocaliserBase):
         :Return:
             | (geometry_msgs.msg.Pose) robot's estimated pose.
          """
-        # ----- Basic implementation, returns mean pose of all particles
-
-        particles = len(self.particlecloud.poses)
-
+        # ----- Advanced implementation, returns mean pose of the largest cluster of particles
+        
+        particle_count = len(self.particlecloud.poses)
+        
+        
+        #Find min and max values of x, y, and angle in the particle cloud
+        
+        pose_0 = self.particlecloud.poses[0]
+        x_min, x_max = pose_0.position.x, pose_0.position.x
+        y_min, y_max = pose_0.position.y, pose_0.position.y
+        angle_min, angle_max = getHeading(pose_0.orientation), getHeading(pose_0.orientation)
+        
+        for pose in self.particlecloud.poses:
+            x = pose.position.x
+            y = pose.position.y
+            angle = getHeading(pose.orientation)
+            
+            if x < x_min:
+                x_min = x
+            elif x > x_max:
+                x_max = x
+            
+            if y < y_min:
+                y_min = y
+            elif y > y_max:
+                y_max = y
+            
+            if angle < angle_min:
+                angle_min = angle
+            elif angle > angle_max:
+                angle_max = angle
+        
+        
+        #Divide the x-y-angle space the cloud covers into a grid
+        
+        grid_size = 10
+        cell_x_size = (x_max - x_min) / grid_size
+        cell_y_size = (y_max - y_min) / grid_size
+        cell_angle_size = (angle_max - angle_min) / grid_size
+        grid = [[[[] for i in range(grid_size)] for j in range(grid_size)] for k in range(grid_size)]
+        
+        
+        #Assign each particle to its corresponding cell in the grid
+        
+        for pose in self.particlecloud.poses:
+            x_coord = math.floor((pose.position.x - x_min) / cell_x_size)
+            y_coord = math.floor((pose.position.y - y_min) / cell_y_size)
+            angle_coord = math.floor((getHeading(pose.orientation) - angle_min) / cell_angle_size)
+            
+            if x_coord == grid_size:
+                x_coord = grid_size - 1
+            if y_coord == grid_size:
+                y_coord = grid_size - 1
+            if angle_coord == grid_size:
+                angle_coord = grid_size - 1
+            
+            grid[x_coord][y_coord][angle_coord].append(pose)
+        
+        
+        #Pick the 2x2x2 cube which contains the most particles,
+        #   and identify this as the largest cluster
+        
+        largest_cluster = []
+        
+        for i in range(0, grid_size - 1):
+            for j in range(0, grid_size - 1):
+                for k in range(0, grid_size - 1):
+                    cube = grid[i][j][k] + grid[i + 1][j][k]
+                    cube = cube + grid[i][j + 1][k] + grid[i + 1][j + 1][k]
+                    cube = cube + grid[i][j][k + 1] + grid[i + 1][j][k + 1]
+                    cube = cube + grid[i][j + 1][k + 1] + grid[i + 1][j + 1][k + 1]
+                    
+                    if len(cube) > len(largest_cluster):
+                        largest_cluster = cube
+        
+        
+        #Find and return the average pose of the largest cluster
+        
         x_sum, y_sum, sin_angle_sum, cos_angle_sum = 0, 0, 0, 0
 
-        for i in range(0, particles):
-            x_sum += self.particlecloud.poses[i].position.x
-            y_sum += self.particlecloud.poses[i].position.y
+        for pose in largest_cluster:
+            x_sum += pose.position.x
+            y_sum += pose.position.y
 
-            angle = getHeading(self.particlecloud.poses[i].orientation)
+            angle = getHeading(pose.orientation)
             sin_angle_sum += math.sin(angle)
             cos_angle_sum += math.cos(angle)
-
-        x_mean = x_sum / particles
-        y_mean = y_sum / particles
+        
+        x_mean = x_sum / particle_count
+        y_mean = y_sum / particle_count
         angle_mean = math.atan2(sin_angle_sum, cos_angle_sum)
-
+        
         return new_pose(x_mean, y_mean, angle_mean)
 
 
