@@ -1,4 +1,5 @@
 import math
+import random
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -65,6 +66,14 @@ def create_grid(grid):
     return np_grid.reshape(grid.info.width, grid.info.height).transpose()
 
 
+def get_valid_grid(grid):
+    """Get all positions where the grid is 0"""
+    np_grid = np.array(grid)
+    valid_points = list(zip(*np.where(np_grid == 0)))
+
+    return [grid_to_pos(x, y) for x, y in valid_points]
+
+
 def sample_normal_distribution(variance):
     """Sample from a normal distribution"""
     return np.random.normal(0, math.sqrt(variance))
@@ -117,9 +126,11 @@ def smooothing_kernel(radius, distance):
     value = max(0, radius ** 2 - distance ** 2)
     return value ** 3 / volume
 
+
 def clamp(value, minimum, maximum):
     """Clamp a value between -15 and 15."""
     return max(minimum, min(maximum, value))
+
 
 # --------------------------------------------------------------------- Main Class
 
@@ -134,12 +145,14 @@ class PFLocaliser(PFLocaliserBase):
         self.ODOM_TRANSLATION_NOISE = 1  # Odometry model x axis (forward) noise
         self.ODOM_DRIFT_NOISE = 1  # Odometry model y axis (side-to-side) noise
 
-        # ----- Sensor model parameters
-        self.NUMBER_PREDICTED_READINGS = 20  # Number of readings to predict
+        self.NOISE_MAX = 5
 
-        # ----- Particle cloud configuration
-        self.NUMBER_OF_PARTICLES = 200
+        # ----- Sensor model parameters
+        self.NUMBER_PREDICTED_READINGS = 200  # Number of readings to predict
+
+        # ----- Map configuration
         self.grid_map = []
+        self.valid_map = []
         self.density_map = []
         self.density_grid = None
 
@@ -213,12 +226,13 @@ class PFLocaliser(PFLocaliserBase):
         """
 
         self.grid_map = create_grid(self.occupancy_map)
-        if isDebug:
-            visualize_grid(self.grid_map)
-            # self.test_density_function()
+        self.valid_map = get_valid_grid(self.grid_map)
+        # if isDebug:
+        # visualize_grid(self.grid_map)
+        # self.test_density_function()
 
         pose_array = PoseArray()
-        for _ in range(self.NUMBER_OF_PARTICLES):
+        for _ in range(self.NUMBER_PREDICTED_READINGS):
             insert_pose = Pose()
             retry_count = 0
 
@@ -228,7 +242,7 @@ class PFLocaliser(PFLocaliserBase):
                 # Add noise to x, y, and orientation
                 noise_x = sample_normal_distribution(deviation_offset) * self.ODOM_TRANSLATION_NOISE
                 noise_y = sample_normal_distribution(deviation_offset) * self.ODOM_DRIFT_NOISE
-                noise_angle = sample_normal_distribution(deviation_offset) * self.ODOM_TRANSLATION_NOISE
+                noise_angle = sample_normal_distribution(deviation_offset) * self.ODOM_ROTATION_NOISE
 
                 insert_pose.position.x = initialpose.pose.pose.position.x + noise_x
                 insert_pose.position.y = initialpose.pose.pose.position.y + noise_y
@@ -256,13 +270,20 @@ class PFLocaliser(PFLocaliserBase):
             weight = self.sensor_model.get_weight(scan, pose)
             weights.append(weight)
 
-        resampled_poses = self.systematic_resampling(self.particlecloud.poses, weights)
+        avg_weight = sum(weights) / len(weights)
+        random_particles_count = int(40 * (1 / avg_weight))
+
+        self.ODOM_ROTATION_NOISE = self.NOISE_MAX * (1 / avg_weight)
+        self.ODOM_TRANSLATION_NOISE = self.NOISE_MAX * (1 / avg_weight)
+        self.ODOM_DRIFT_NOISE = self.NOISE_MAX * (1 / avg_weight)
+
+        resampled_poses = self.systematic_resampling(self.particlecloud.poses, weights, random_particles_count)
 
         self.particlecloud = resampled_poses
 
-    def systematic_resampling(self, poses, weights):
+    def systematic_resampling(self, poses, weights, random_particles_count):
         """Resample poses based on weights"""
-        M = len(weights)
+        M = max(0, len(weights) - random_particles_count)
         cdf = create_cdf(weights)
         # Start in random part of first section
         u = [np.random.uniform(0, 1 / M)]
@@ -279,9 +300,9 @@ class PFLocaliser(PFLocaliserBase):
             while retry_count < self.MAX_RETRIES:
                 deviation_offset = 0.001 + (0.0001 * retry_count)
                 # Random noise for each parameter
-                noise_x = sample_normal_distribution(deviation_offset)  # need to multiply by parameter
-                noise_y = sample_normal_distribution(deviation_offset)  # need to multiply by parameter
-                noise_angle = sample_normal_distribution(deviation_offset)  # need to multiply by parameter
+                noise_x = sample_normal_distribution(0.01) * self.ODOM_TRANSLATION_NOISE
+                noise_y = sample_normal_distribution(0.01) * self.ODOM_DRIFT_NOISE
+                noise_angle = sample_normal_distribution(0.01) * self.ODOM_ROTATION_NOISE
 
                 # Add noise to parameter
                 insert_pose.position.x = poses[i].position.x + noise_x
@@ -294,6 +315,11 @@ class PFLocaliser(PFLocaliserBase):
 
             S.poses.append(insert_pose)
             u.append(u[j] + 1 / M)
+
+        random_points = np.random.choice(self.valid_map, size=random_particles_count)
+
+        for point in random_points:
+            S.poses.append(new_pose(point.x, point.y, random.uniform(0, math.pi * 2)))
         return S
 
     def estimate_pose(self):
