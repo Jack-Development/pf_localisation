@@ -54,11 +54,9 @@ def grid_to_pos(x_prime, y_prime):
 
 def is_valid(pose, grid):
     """Check if a pose is valid within a given grid"""
-    print(pose.position.x, pose.position.y)
     grid_pos = pos_to_grid(pose.position.x, pose.position.y)
     grid_pos.x = clamp(grid_pos.x, 0, 602)
     grid_pos.y = clamp(grid_pos.y, 0, 602)
-    print(grid_pos)
     return grid[grid_pos.x][grid_pos.y] == 0
 
 
@@ -74,6 +72,7 @@ def get_valid_grid(grid):
     valid_points = list(zip(*np.where(np_grid == 0)))
 
     return [grid_to_pos(x, y) for x, y in valid_points]
+
 
 def sample_normal_distribution(variance):
     """Sample from a normal distribution"""
@@ -127,9 +126,11 @@ def smooothing_kernel(radius, distance):
     value = max(0, radius ** 2 - distance ** 2)
     return value ** 3 / volume
 
+
 def clamp(value, minimum, maximum):
     """Clamp a value between -15 and 15."""
     return max(minimum, min(maximum, value))
+
 
 # --------------------------------------------------------------------- Main Class
 
@@ -224,13 +225,13 @@ class PFLocaliser(PFLocaliserBase):
 
         self.grid_map = create_grid(self.occupancy_map)
         self.valid_map = get_valid_grid(self.grid_map)
-        #if isDebug:
-            # visualize_grid(self.grid_map)
-            # self.test_density_function()
+        # if isDebug:
+        # visualize_grid(self.grid_map)
+        # self.test_density_function()
 
         pose_array = PoseArray()
         MAX_RETRIES = 1000
-        for _ in range(self.NUMBER_OF_PARTICLES):
+        for _ in range(self.NUMBER_PREDICTED_READINGS):
             insert_pose = Pose()
             retry_count = 0
 
