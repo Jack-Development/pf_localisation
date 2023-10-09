@@ -138,6 +138,7 @@ class PFLocaliser(PFLocaliserBase):
         self.ODOM_DRIFT_NOISE = 1  # Odometry model y axis (side-to-side) noise
 
         self.NOISE_MAX = 5
+        self.NOISE_MIN = 0.3
 
         # ----- Sensor model parameters
         self.NUMBER_PREDICTED_READINGS = 200  # Number of readings to predict
@@ -251,11 +252,11 @@ class PFLocaliser(PFLocaliserBase):
             weights.append(weight)
 
         avg_weight = sum(weights) / len(weights)
-        random_particles_count = int(40 * (1 / avg_weight))
+        random_particles_count = int(100 * (1 / avg_weight**0.5))
 
-        self.ODOM_ROTATION_NOISE = self.NOISE_MAX * (1 / avg_weight)
-        self.ODOM_TRANSLATION_NOISE = self.NOISE_MAX * (1 / avg_weight)
-        self.ODOM_DRIFT_NOISE = self.NOISE_MAX * (1 / avg_weight)
+        self.ODOM_ROTATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight**0.5)
+        self.ODOM_TRANSLATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) *  (1 / avg_weight)
+        self.ODOM_DRIFT_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) *  (1 / avg_weight)
 
         resampled_poses = self.systematic_resampling(self.particlecloud.poses, weights, random_particles_count)
 
