@@ -53,11 +53,9 @@ def grid_to_pos(x_prime, y_prime):
 
 def is_valid(pose, grid):
     """Check if a pose is valid within a given grid"""
-    print(pose.position.x, pose.position.y)
     grid_pos = pos_to_grid(pose.position.x, pose.position.y)
     grid_pos.x = clamp(grid_pos.x, 0, 602)
     grid_pos.y = clamp(grid_pos.y, 0, 602)
-    print(grid_pos)
     return grid[grid_pos.x][grid_pos.y] == 0
 
 
@@ -145,6 +143,8 @@ class PFLocaliser(PFLocaliserBase):
         self.density_map = []
         self.density_grid = None
 
+        self.MAX_RETRIES = 100
+
     def test_density_function(self):
         pose_array = PoseArray()
         pose_array.poses.append(new_pose(6, 4, 0))
@@ -218,12 +218,11 @@ class PFLocaliser(PFLocaliserBase):
             # self.test_density_function()
 
         pose_array = PoseArray()
-        MAX_RETRIES = 1000
         for _ in range(self.NUMBER_OF_PARTICLES):
             insert_pose = Pose()
             retry_count = 0
 
-            while retry_count < MAX_RETRIES:
+            while retry_count < self.MAX_RETRIES:
                 deviation_offset = 0.1 + (0.1 * retry_count)
 
                 # Add noise to x, y, and orientation
@@ -270,7 +269,6 @@ class PFLocaliser(PFLocaliserBase):
 
         S = PoseArray()  # resampled data
         i = 0
-        MAX_RETRIES = 1000
         for j in range(0, M):
             # Check if next offset is in next section
             while u[j] > cdf[i]:
@@ -278,7 +276,7 @@ class PFLocaliser(PFLocaliserBase):
 
             retry_count = 0
             insert_pose = Pose()
-            while retry_count < MAX_RETRIES:
+            while retry_count < self.MAX_RETRIES:
                 deviation_offset = 0.001 + (0.0001 * retry_count)
                 # Random noise for each parameter
                 noise_x = sample_normal_distribution(deviation_offset)  # need to multiply by parameter
