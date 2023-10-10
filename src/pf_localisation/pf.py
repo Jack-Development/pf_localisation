@@ -279,15 +279,12 @@ class PFLocaliser(PFLocaliserBase):
         The map is of size 602*602
         We will break it up into an 86*86 grid (squares of side length 7)
         """
-        SQUARE_SIDE_LENGTH = 7
+        SQUARE_SIDE_LENGTH = 1
         NUMBER_OF_SQUARES = int(602/SQUARE_SIDE_LENGTH)
         heatmap = np.zeros((NUMBER_OF_SQUARES, NUMBER_OF_SQUARES, 2))
         for pose in self.particlecloud.poses:
-            x = math.floor(pose.position.x/NUMBER_OF_SQUARES) + (NUMBER_OF_SQUARES // 2)
-            y = math.floor(pose.position.y/NUMBER_OF_SQUARES) + (NUMBER_OF_SQUARES // 2)
-
-            x = max(0, min(x, NUMBER_OF_SQUARES - 1))
-            y = max(0, min(y, NUMBER_OF_SQUARES - 1))
+            x = math.floor(pose.position.x) - 15 + NUMBER_OF_SQUARES//2
+            y = math.floor(pose.position.y) - 15 + NUMBER_OF_SQUARES//2
 
             angle = getHeading(pose.orientation)
             sin_angle = math.sin(angle)
@@ -311,13 +308,12 @@ class PFLocaliser(PFLocaliserBase):
 
         angle_mean = float(heatmap[x, y, 0])/float(heatmap[x, y, 1])
 
-        # convert position in heatmap to real position
-        x = (x - (NUMBER_OF_SQUARES // 2))*SQUARE_SIDE_LENGTH
-        y = (y - (NUMBER_OF_SQUARES // 2))*SQUARE_SIDE_LENGTH
+        # convert position in heatmap to real position - this should be more granular
+        x = (x - NUMBER_OF_SQUARES // 2) + 15
+        y = (y - NUMBER_OF_SQUARES // 2) + 15
 
-        grid_loc = pos_to_grid(x,y)
 
-        newpose = new_pose(grid_loc.x,grid_loc.y,angle_mean)
+        newpose = new_pose(x,y,angle_mean)
         return newpose
 
         
