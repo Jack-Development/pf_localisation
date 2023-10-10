@@ -276,6 +276,54 @@ class PFLocaliser(PFLocaliserBase):
 
     def estimate_pose(self):
         """
+        The map is of size 602*602
+        We will break it up into an 86*86 grid (squares of side length 7)
+        """
+        SQUARE_SIDE_LENGTH = 7
+        NUMBER_OF_SQUARES = int(602/SQUARE_SIDE_LENGTH)
+        heatmap = np.zeros((NUMBER_OF_SQUARES, NUMBER_OF_SQUARES, 2))
+        for pose in self.particlecloud.poses:
+            x = math.floor(pose.position.x/NUMBER_OF_SQUARES) + (NUMBER_OF_SQUARES // 2)
+            y = math.floor(pose.position.y/NUMBER_OF_SQUARES) + (NUMBER_OF_SQUARES // 2)
+
+            x = max(0, min(x, NUMBER_OF_SQUARES - 1))
+            y = max(0, min(y, NUMBER_OF_SQUARES - 1))
+
+            angle = getHeading(pose.orientation)
+            sin_angle = math.sin(angle)
+            cos_angle = math.cos(angle)
+            angle = math.atan2(sin_angle, cos_angle)
+            heatmap[x, y, 0] += angle
+
+            heatmap[x,y,1] += 1 # represents the number of particles in a specific square of the heatmap
+        
+        if isDebug:
+            plt.imshow(heatmap, cmap='viridis', interpolation='nearest', vmin=0, vmax=86)
+            plt.xlim(0, 86)
+            plt.colorbar()
+            plt.show()
+
+        max_index = np.argmax(heatmap[:,:,1])
+        max_index_2d = np.unravel_index(max_index, heatmap[:,:,1].shape)
+
+        x = max_index_2d[0]
+        y = max_index_2d[1]
+
+        angle_mean = float(heatmap[x, y, 0])/float(heatmap[x, y, 1])
+
+        # convert position in heatmap to real position
+        x = (x - (NUMBER_OF_SQUARES // 2))*SQUARE_SIDE_LENGTH
+        y = (y - (NUMBER_OF_SQUARES // 2))*SQUARE_SIDE_LENGTH
+
+        grid_loc = pos_to_grid(x,y)
+
+        newpose = new_pose(grid_loc.x,grid_loc.y,angle_mean)
+        return newpose
+
+        
+
+    def estimate_pose_old(self):
+        """
         This should calculate and return an updated robot pose estimate based
         on the particle cloud (self.particlecloud).
         
@@ -308,7 +356,8 @@ class PFLocaliser(PFLocaliserBase):
         y_mean = y_sum / particles
         angle_mean = math.atan2(sin_angle_sum, cos_angle_sum)
 
-        return new_pose(x_mean, y_mean, angle_mean)
+        newpose = new_pose(x_mean, y_mean, angle_mean)
+        return newpose
 
 
 # --------------------------------------------------------------------- Debugging Functions
