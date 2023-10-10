@@ -316,46 +316,6 @@ class PFLocaliser(PFLocaliserBase):
         newpose = new_pose(x,y,angle_mean)
         return newpose
 
-        
-
-    def estimate_pose_old(self):
-        """
-        This should calculate and return an updated robot pose estimate based
-        on the particle cloud (self.particlecloud).
-        
-        Create new estimated pose, given particle cloud
-        E.g. just average the location and orientation values of each of
-        the particles and return this.
-        
-        Better approximations could be made by doing some simple clustering,
-        e.g. taking the average location of half the particles after 
-        throwing away any which are outliers
-
-        :Return:
-            | (geometry_msgs.msg.Pose) robot's estimated pose.
-         """
-        # ----- Basic implementation, returns mean pose of all particles
-
-        particles = len(self.particlecloud.poses)
-
-        x_sum, y_sum, sin_angle_sum, cos_angle_sum = 0, 0, 0, 0
-
-        for i in range(0, particles):
-            x_sum += self.particlecloud.poses[i].position.x
-            y_sum += self.particlecloud.poses[i].position.y
-
-            angle = getHeading(self.particlecloud.poses[i].orientation)
-            sin_angle_sum += math.sin(angle)
-            cos_angle_sum += math.cos(angle)
-
-        x_mean = x_sum / particles
-        y_mean = y_sum / particles
-        angle_mean = math.atan2(sin_angle_sum, cos_angle_sum)
-
-        newpose = new_pose(x_mean, y_mean, angle_mean)
-        return newpose
-
-
 # --------------------------------------------------------------------- Debugging Functions
 def main():
     """Start example localiser and test particle_cloud"""
