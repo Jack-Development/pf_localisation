@@ -252,7 +252,7 @@ class PFLocaliser(PFLocaliserBase):
             weights.append(weight)
 
         avg_weight = sum(weights) / len(weights)
-        random_particles_count = int(100 * (1 / avg_weight**0.5))
+        random_particles_count = int(100 * (1 / avg_weight**0.5)) # number of particles that will be places randomly around the valid space
 
         self.ODOM_ROTATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight**0.5)
         self.ODOM_TRANSLATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) *  (1 / avg_weight)
@@ -264,7 +264,7 @@ class PFLocaliser(PFLocaliserBase):
 
     def systematic_resampling(self, poses, weights, random_particles_count):
         """Resample poses based on weights"""
-        M = max(0, len(weights) - random_particles_count)
+        M = max(0, len(weights) - random_particles_count) # number of particles that will have gaussian noise added to them
         cdf = create_cdf(weights)
         # Start in random part of first section
         u = [np.random.uniform(0, 1 / M)]
