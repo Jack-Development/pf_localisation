@@ -313,8 +313,6 @@ class PFLocaliser(PFLocaliserBase):
          """
         # ----- Advanced implementation, returns mean pose of the largest cluster of particles
         
-        particle_count = len(self.particlecloud.poses)
-        
         
         #Find min and max values of x, y, and angle in the particle cloud
         
