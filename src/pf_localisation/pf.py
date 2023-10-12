@@ -264,16 +264,16 @@ class PFLocaliser(PFLocaliserBase):
 
     def systematic_resampling(self, poses, weights, random_particles_count):
         """Resample poses based on weights"""
-        M = max(0, len(weights) - random_particles_count) # number of particles that will have gaussian noise added to them
+        num_noisy_particles = max(0, len(weights) - random_particles_count) # number of particles that will have gaussian noise added to them
         cdf = create_cdf(weights)
         # Start in random part of first section
-        u = [np.random.uniform(0, 1 / M)]
+        threshold = [np.random.uniform(0, 1 / num_noisy_particles)]
 
-        S = PoseArray()  # resampled data
+        resampled_data = PoseArray()  # resampled data
         i = 0
-        for j in range(0, M):
+        for j in range(0, num_noisy_particles):
             # Check if next offset is in next section
-            while u[j] > cdf[i]:
+            while threshold[j] > cdf[i]:
                 i += 1
 
             # Random noise for each parameter
@@ -286,14 +286,14 @@ class PFLocaliser(PFLocaliserBase):
             position_y = poses[i].position.y + noise_y
             orientation = rotateQuaternion(poses[i].orientation, noise_angle)
 
-            S.poses.append(new_pose(position_x, position_y, orientation))
-            u.append(u[j] + 1 / M)
+            resampled_data.poses.append(new_pose(position_x, position_y, orientation))
+            threshold.append(threshold[j] + 1 / num_noisy_particles)
 
         random_points = np.random.choice(self.valid_map, size=random_particles_count)
 
         for point in random_points:
-            S.poses.append(new_pose(point.x, point.y, random.uniform(0, math.pi * 2)))
-        return S
+            resampled_data.poses.append(new_pose(point.x, point.y, random.uniform(0, math.pi * 2)))
+        return resampled_data
 
     def estimate_pose(self):
         """
