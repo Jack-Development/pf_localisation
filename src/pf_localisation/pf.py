@@ -71,6 +71,7 @@ def get_valid_grid(grid):
 
     return [grid_to_pos(x, y) for x, y in valid_points]
 
+
 def sample_normal_distribution(variance):
     """Sample from a normal distribution"""
     return np.random.normal(0, math.sqrt(variance))
@@ -218,9 +219,9 @@ class PFLocaliser(PFLocaliserBase):
 
         self.grid_map = create_grid(self.occupancy_map)
         self.valid_map = get_valid_grid(self.grid_map)
-        #if isDebug:
-            # visualize_grid(self.grid_map)
-            # self.test_density_function()
+        # if isDebug:
+        # visualize_grid(self.grid_map)
+        # self.test_density_function()
 
         pose_array = PoseArray()
         for i in range(self.NUMBER_PREDICTED_READINGS):
@@ -252,11 +253,11 @@ class PFLocaliser(PFLocaliserBase):
             weights.append(weight)
 
         avg_weight = sum(weights) / len(weights)
-        random_particles_count = int(100 * (1 / avg_weight**0.5)) # number of particles that will be places randomly around the valid space
+        random_particles_count = int(100 * (1 / avg_weight ** 0.5)) # number of particles that will be places randomly around the valid space
 
-        self.ODOM_ROTATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight**0.5)
-        self.ODOM_TRANSLATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) *  (1 / avg_weight)
-        self.ODOM_DRIFT_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) *  (1 / avg_weight)
+        self.ODOM_ROTATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight ** 0.5)
+        self.ODOM_TRANSLATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight)
+        self.ODOM_DRIFT_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight)
 
         resampled_poses = self.systematic_resampling(self.particlecloud.poses, weights, random_particles_count)
 
