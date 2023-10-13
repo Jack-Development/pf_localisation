@@ -266,14 +266,14 @@ class PFLocaliser(PFLocaliserBase):
         """Resample poses based on weights"""
         num_noisy_particles = max(0, len(weights) - random_particles_count) # Set the number of particles that will have gaussian noise added to them
         cdf = create_cdf(weights) # Create the cumulative distribution function of the weights of all of the particles, normalised to between 0 and 1
-        threshold = [np.random.uniform(0, 1 / num_noisy_particles)] # Generate an initial threshold by randomly sampling the uniform distribution
+        threshold = [np.random.uniform(0, 1 / num_noisy_particles)] # Generate an initial threshold by randomly sampling the uniform distribution (introduces randomness and prevents determinism).
 
         resampled_data = PoseArray()  # PoseArray to contain resampled data. This represents the new particle cloud
         i = 0
         for j in range(0, num_noisy_particles):
             # Check if threshold has been passed, i.e. if enough particles of a specific weight have been added
             while threshold[j] > cdf[i]:
-                i += 1
+                i += 1 # Increment counter which selects which particle to resample
 
             # Generate gaussian noise for each pose dimension
             noise_x = sample_normal_distribution(0.01) * self.ODOM_TRANSLATION_NOISE
