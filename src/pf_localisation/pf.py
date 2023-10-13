@@ -264,35 +264,34 @@ class PFLocaliser(PFLocaliserBase):
 
     def systematic_resampling(self, poses, weights, random_particles_count):
         """Resample poses based on weights"""
-        num_noisy_particles = max(0, len(weights) - random_particles_count) # set the number of particles that will have gaussian noise added to them
-        cdf = create_cdf(weights) # create the cumulative distribution function of the weights of all of the particles
-        # start in random part of first section
-        threshold = [np.random.uniform(0, 1 / num_noisy_particles)] # generate an initial threshold
+        num_noisy_particles = max(0, len(weights) - random_particles_count) # Set the number of particles that will have gaussian noise added to them
+        cdf = create_cdf(weights) # Create the cumulative distribution function of the weights of all of the particles, normalised to between 0 and 1
+        threshold = [np.random.uniform(0, 1 / num_noisy_particles)] # Generate an initial threshold by randomly sampling the uniform distribution
 
         resampled_data = PoseArray()  # PoseArray to contain resampled data. This represents the new particle cloud
         i = 0
         for j in range(0, num_noisy_particles):
-            # check if next offset is in next section, i.e. if enough particles of a specific weight have been added
+            # Check if threshold has been passed, i.e. if enough particles of a specific weight have been added
             while threshold[j] > cdf[i]:
                 i += 1
 
-            # generate gaussian noise for each pose dimension
+            # Generate gaussian noise for each pose dimension
             noise_x = sample_normal_distribution(0.01) * self.ODOM_TRANSLATION_NOISE
             noise_y = sample_normal_distribution(0.01) * self.ODOM_DRIFT_NOISE
             noise_angle = sample_normal_distribution(0.01) * self.ODOM_ROTATION_NOISE
 
-            # add noise to each pose dimension
+            # Add noise to each pose dimension
             position_x = poses[i].position.x + noise_x
             position_y = poses[i].position.y + noise_y
             orientation = rotateQuaternion(poses[i].orientation, noise_angle)
 
-            resampled_data.poses.append(new_pose(position_x, position_y, orientation)) # add resampled pose to particle cloud
-            threshold.append(threshold[j] + 1 / num_noisy_particles) # update threshold to ensure correct distribution of particles
+            resampled_data.poses.append(new_pose(position_x, position_y, orientation)) # Add resampled pose to particle cloud
+            threshold.append(threshold[j] + 1 / num_noisy_particles) # Update threshold to ensure correct distribution of particles
 
-        random_points = np.random.choice(self.valid_map, size=random_particles_count) # decide where to randomly place some particles around the valid space
+        random_points = np.random.choice(self.valid_map, size=random_particles_count) # Decide where to randomly place some particles around the valid space
 
         for point in random_points:
-            resampled_data.poses.append(new_pose(point.x, point.y, random.uniform(0, math.pi * 2))) # append random poses to the new particle cloud
+            resampled_data.poses.append(new_pose(point.x, point.y, random.uniform(0, math.pi * 2))) # Append random poses to the new particle cloud
         return resampled_data
 
     def estimate_pose(self):
