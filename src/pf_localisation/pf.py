@@ -264,7 +264,7 @@ class PFLocaliser(PFLocaliserBase):
 
     def systematic_resampling(self, poses, weights, random_particles_count):
         """Resample poses based on weights"""
-        num_noisy_particles = max(1, len(weights) - random_particles_count) # set the number of particles that will have gaussian noise added to them
+        num_noisy_particles = max(0, len(weights) - random_particles_count) # set the number of particles that will have gaussian noise added to them
         cdf = create_cdf(weights) # create the cumulative distribution function of the weights of all of the particles
         # start in random part of first section
         threshold = [np.random.uniform(0, 1 / num_noisy_particles)] # generate an initial threshold
