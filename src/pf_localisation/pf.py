@@ -256,7 +256,7 @@ class PFLocaliser(PFLocaliserBase):
             weights.append(weight)
 
         avg_weight = sum(weights) / len(weights)
-        random_particles_count = int(100 * (1 / avg_weight ** 0.5)) # number of particles that will be places randomly around the valid space
+        random_particles_count = int(200 * (1 / avg_weight ** 0.5)) # number of particles that will be places randomly around the valid space
 
         self.ODOM_ROTATION_NOISE = self.ROTATION_NOISE_MIN + (self.ROTATION_NOISE_MAX - self.ROTATION_NOISE_MIN) * (1 / avg_weight ** 0.5)
         self.ODOM_TRANSLATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight)
