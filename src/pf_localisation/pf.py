@@ -141,6 +141,9 @@ class PFLocaliser(PFLocaliserBase):
         self.NOISE_MAX = 5
         self.NOISE_MIN = 0.3
 
+        self.ROTATION_NOISE_MAX = math.pi
+        self.ROTATION_NOISE_MIN = 0
+
         # ----- Sensor model parameters
         self.NUMBER_PREDICTED_READINGS = 200  # Number of readings to predict
 
@@ -255,7 +258,7 @@ class PFLocaliser(PFLocaliserBase):
         avg_weight = sum(weights) / len(weights)
         random_particles_count = int(100 * (1 / avg_weight ** 0.5)) # number of particles that will be places randomly around the valid space
 
-        self.ODOM_ROTATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight ** 0.5)
+        self.ODOM_ROTATION_NOISE = self.ROTATION_NOISE_MIN + (self.ROTATION_NOISE_MAX - self.ROTATION_NOISE_MIN) * (1 / avg_weight ** 0.5)
         self.ODOM_TRANSLATION_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight)
         self.ODOM_DRIFT_NOISE = self.NOISE_MIN + (self.NOISE_MAX - self.NOISE_MIN) * (1 / avg_weight)
 
